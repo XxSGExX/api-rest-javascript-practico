@@ -11,8 +11,27 @@ const api = axios.create({
 
 //Utils
 
-function createMovies(movies, container){
-    container.innerHTML = "";
+const lazyLoader = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+        if (entry.isIntersecting){
+            const url = entry.target.getAttribute('data-img');
+            entry.target.setAttribute('src', url)
+        }
+    })
+});
+
+function createMovies(
+    movies, 
+    container, 
+    {
+        lazyLoad = false, 
+        clean = true,
+
+    } = {},
+)  {
+    if (clean) {
+        container.innerHTML = "";
+    }
 
     movies.forEach(movie => {
         const movieContainer = document.createElement('div');
@@ -24,8 +43,17 @@ function createMovies(movies, container){
         const movieImg = document.createElement('img');
         movieImg.classList.add('movie-img');
         movieImg.setAttribute('alt', movie.title);
-        movieImg.setAttribute('src', 'https://image.tmdb.org/t/p/w300' + movie.poster_path
+        movieImg.setAttribute(lazyLoad ? 'data-img' : 'src', 'https://image.tmdb.org/t/p/w300' + movie.poster_path
         );
+        movieImg.addEventListener('error', () => {
+            movieImg.setAttribute(
+            'src', 
+            'https://static.platzi.com/static/images/error/img404.png')
+        });
+
+        if(lazyLoad){
+            lazyLoader.observe(movieImg);
+        }
 
         movieContainer.appendChild(movieImg);
         container.appendChild(movieContainer);
@@ -62,7 +90,7 @@ async function getTrendingMoviesPreview() {
     const {data} = await api('trending/movie/day');
     const movies = data.results;
 
-    createMovies(movies, trendingMoviesPreviewList);
+    createMovies(movies, trendingMoviesPreviewList, true);
 }
 
 async function getCategoriesPreview() {
@@ -81,7 +109,7 @@ async function getMoviesbyCategory(id) {
     });
     const movies = data.results;
 
-    createMovies(movies, genericSection);
+    createMovies(movies, genericSection, true);
 }
 
 async function getMoviesBySerach(query) {
@@ -99,14 +127,51 @@ async function getTrendingMovies() {
     const {data} = await api('trending/movie/day');
     const movies = data.results;
 
-    createMovies(movies, genericSection);
+    createMovies(movies, genericSection, { lazyLoad: true, clean: true});
+
+    // const btnLoadmore = document.createElement('button');
+    // btnLoadmore.innerText = 'cargar mas';
+    // btnLoadmore.addEventListener('click', getPaginatedTrendingMovies)
+    // genericSection.appendChild(btnLoadmore);
+}
+
+async function getPaginatedTrendingMovies () {
+    const {scrollTop, 
+        scrollHeight, 
+        clientHeight
+    } = document.documentElement;
+
+    const scrollIsBottom = (scrollTop + clientHeight) >= (scrollHeight - 15);
+
+    if (scrollIsBottom) {
+        page++;
+    const {data} = await api('trending/movie/day', {
+        params: {
+            page,
+        },
+    });
+    const movies = data.results;
+
+    createMovies(
+        movies, 
+        genericSection, 
+        { lazyLoad: true, 
+            clean: false,
+        });
+    }
+
+    
+
+    // const btnLoadmore = document.createElement('button');
+    // btnLoadmore.innerText = 'cargar mas';
+    // btnLoadmore.addEventListener('click', getPaginatedTrendingMovies)
+    // genericSection.appendChild(btnLoadmore);
 }
 
 async function getMovieById(id) {
     const {data: movie} = await api('movie/' + id);
 
    const movieImgUrl = 'https://image.tmdb.org/t/p/w500' + movie.poster_path;
-   console.log(movieImgUrl);
    headerSection.style.background = `
    linear-gradient(
     180deg, 
